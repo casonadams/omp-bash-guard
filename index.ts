@@ -44,6 +44,11 @@ type ExtensionAskDialogResult = ExtensionAskDialogSubmitResult | ExtensionAskDia
 
 interface ExtensionUIContext {
   confirm(title: string, message: string, options?: { signal?: AbortSignal }): Promise<boolean>;
+  input?(
+    title: string,
+    placeholder?: string,
+    options?: { signal?: AbortSignal },
+  ): Promise<string | undefined>;
   askDialog?(
     questions: ExtensionAskDialogQuestion[],
     dialogOptions?: { signal?: AbortSignal },
@@ -98,41 +103,56 @@ export default function (pi: PiExtensionAPI) {
         if (ctx?.hasUI) {
           if (typeof ctx.ui?.askDialog === "function") {
             const isMultiline = command.includes("\n");
-            const headerCommand = isMultiline
-              ? `${command.split("\n")[0].slice(0, 60)} ... (multiline)`
-              : command.length > 80
-                ? `${command.slice(0, 77)}...`
-                : command;
-            const safeCommand = headerCommand.replace(/`/g, "'");
+            let commandBlock: string;
+            if (isMultiline) {
+              const lines = command.split("\n");
+              const formattedLines =
+                lines.length <= 8
+                  ? lines.map((l) => `  ${l}`).join("\n")
+                  : [
+                      ...lines.slice(0, 6).map((l) => `  ${l}`),
+                      `  ... (${lines.length - 6} more lines)`,
+                    ].join("\n");
+              commandBlock = `**Command:**\n${formattedLines}`;
+            } else {
+              const displayCmd = command.length > 100 ? `${command.slice(0, 97)}...` : command;
+              commandBlock = `**Command:** \`${displayCmd.replace(/`/g, "'")}\``;
+            }
 
-            const question = `**Command:** \`${safeCommand}\`\n**Security Audit:** ${reason}\n**Allow execution?**`;
+            const question = `${commandBlock}\n**Security Audit:** ${reason}\n**Allow execution?**`;
 
             const res = await ctx.ui.askDialog([
               {
                 id: "bash_guard_approval",
                 header: "Bash Guard",
                 question,
-                recommended: 1, // Default cursor on Cancel for safety
-                options: [
-                  {
-                    label: "Proceed",
-                    preview: `\`\`\`bash\n${command}\n\`\`\``,
-                  },
-                  { label: "Cancel" },
-                ],
+                recommended: 1, // Default cursor on Deny for safety
+                options: [{ label: "Allow" }, { label: "Deny with feedback" }],
               },
             ]);
 
             if (res?.kind === "submit") {
               const selected = res.results[0]?.selectedOptions[0];
-              if (selected === "Proceed") {
+              if (selected === "Allow") {
                 return;
               }
               if (res.results[0]?.customInput) {
                 return {
                   block: true,
-                  reason: `User blocked with feedback: ${res.results[0].customInput}`,
+                  reason: `User denied execution with feedback: ${res.results[0].customInput}`,
                 };
+              }
+              if (selected === "Deny with feedback" && typeof ctx.ui?.input === "function") {
+                const feedback = await ctx.ui.input(
+                  "Deny feedback for agent (optional — Enter to skip, Esc to cancel):",
+                  "e.g. use dry-run or target a different resource",
+                );
+                if (typeof feedback === "string" && feedback.trim()) {
+                  return {
+                    block: true,
+                    reason: `User denied execution with feedback: ${feedback.trim()}`,
+                  };
+                }
               }
             }
 

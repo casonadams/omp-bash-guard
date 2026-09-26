@@ -63,7 +63,7 @@ describe("registerBashGuard", () => {
     });
   });
 
-  test("formats askDialog with single-paragraph question and simple options", async () => {
+  test("formats askDialog with single-paragraph question and Allow / Deny with feedback options", async () => {
     let toolCallHandler: ((event: unknown, ctx: unknown) => Promise<unknown>) | undefined;
     const mockPi = {
       on: (_event: string, handler: (event: unknown, ctx: unknown) => Promise<unknown>) => {
@@ -78,7 +78,7 @@ describe("registerBashGuard", () => {
       dialogArg = questions;
       return {
         kind: "submit",
-        results: [{ selectedOptions: ["Proceed"] }],
+        results: [{ selectedOptions: ["Allow"] }],
       };
     };
 
@@ -101,13 +101,10 @@ describe("registerBashGuard", () => {
     expect(questions[0]?.question).toContain("**Command:** `rm -rf /`");
     expect(questions[0]?.question).toContain("**Security Audit:**");
     expect(questions[0]?.question).toContain("**Allow execution?**");
-    expect(questions[0]?.options).toEqual([
-      { label: "Proceed", preview: "```bash\nrm -rf /\n```" },
-      { label: "Cancel" },
-    ]);
+    expect(questions[0]?.options).toEqual([{ label: "Allow" }, { label: "Deny with feedback" }]);
   });
 
-  test("formats multiline commands with (multiline) in header and full script in Proceed preview", async () => {
+  test("formats multiline commands directly in Command block without preview clutter", async () => {
     let toolCallHandler: ((event: unknown, ctx: unknown) => Promise<unknown>) | undefined;
     const mockPi = {
       on: (_event: string, handler: (event: unknown, ctx: unknown) => Promise<unknown>) => {
@@ -122,7 +119,7 @@ describe("registerBashGuard", () => {
       dialogArg = questions;
       return {
         kind: "submit",
-        results: [{ selectedOptions: ["Proceed"] }],
+        results: [{ selectedOptions: ["Allow"] }],
       };
     };
 
@@ -141,9 +138,48 @@ describe("registerBashGuard", () => {
       question: string;
       options: Array<{ label: string; preview?: string }>;
     }>;
-    expect(questions[0]?.question).toContain("(multiline)");
-    expect(questions[0]?.options[0]?.preview).toBe(`\`\`\`bash\n${multilineCmd}\n\`\`\``);
-    expect(questions[0]?.options[1]?.preview).toBeUndefined();
+    expect(questions[0]?.question).toContain("for pod in $(kubectl get pods); do");
+    expect(questions[0]?.question).toContain("kubectl delete pod $pod");
+    expect(questions[0]?.options[0]?.preview).toBeUndefined();
+  });
+
+  test("prompts for optional feedback when Deny with feedback is selected", async () => {
+    let toolCallHandler: ((event: unknown, ctx: unknown) => Promise<unknown>) | undefined;
+    const mockPi = {
+      on: (_event: string, handler: (event: unknown, ctx: unknown) => Promise<unknown>) => {
+        toolCallHandler = handler;
+      },
+    };
+
+    registerBashGuard(mockPi as unknown as Parameters<typeof registerBashGuard>[0]);
+
+    const mockAskDialog = async () => ({
+      kind: "submit",
+      results: [{ selectedOptions: ["Deny with feedback"] }],
+    });
+
+    let inputPromptAsked = false;
+    const mockInput = async () => {
+      inputPromptAsked = true;
+      return "use dry-run mode";
+    };
+
+    const result = await toolCallHandler!(
+      { toolName: "bash", input: { command: "rm -rf /" } },
+      {
+        hasUI: true,
+        ui: {
+          askDialog: mockAskDialog,
+          input: mockInput,
+        },
+      },
+    );
+
+    expect(inputPromptAsked).toBe(true);
+    expect(result).toEqual({
+      block: true,
+      reason: "User denied execution with feedback: use dry-run mode",
+    });
   });
 
   test("blocks execution when askDialog is cancelled", async () => {
@@ -205,7 +241,7 @@ describe("registerBashGuard", () => {
 
     expect(result).toEqual({
       block: true,
-      reason: "User blocked with feedback: don't delete production",
+      reason: "User denied execution with feedback: don't delete production",
     });
   });
 });
