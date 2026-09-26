@@ -6,11 +6,13 @@
   "main": "index.ts",
   "scripts": {
     "test": "bun test",
-    "lint": "oxlint",
+    "test:coverage": "bun test --coverage",
+    "crap": "bun scripts/check-crap.ts",
+    "lint": "oxlint -D complexity",
     "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "check": "bun run typecheck && bun run lint && bun run format:check && bun run test"
+    "check": "bun run typecheck && bun run lint && bun run format:check && bun run test && bun run crap"
   },
   "omp": {
     "extensions": [
