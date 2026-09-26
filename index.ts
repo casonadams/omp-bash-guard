@@ -107,7 +107,6 @@ export default function (pi: PiExtensionAPI) {
             const safeCommand = displayCommand.replace(/`/g, "'");
 
             const question = `**Command:** \`${safeCommand}\`\n**Security Audit:** ${reason}\n**Allow execution?**`;
-            const fullPreview = `### Command\n\`\`\`bash\n${command}\n\`\`\`\n\n### Security Audit\n${reason}`;
 
             const res = await ctx.ui.askDialog([
               {
@@ -115,18 +114,7 @@ export default function (pi: PiExtensionAPI) {
                 header: "Bash Guard",
                 question,
                 recommended: 1, // Default cursor on Cancel for safety
-                options: [
-                  {
-                    label: "Proceed",
-                    description: "Execute the command as requested",
-                    preview: fullPreview,
-                  },
-                  {
-                    label: "Cancel",
-                    description: "Block execution of this command",
-                    preview: fullPreview,
-                  },
-                ],
+                options: [{ label: "Proceed" }, { label: "Cancel" }],
               },
             ]);
 
