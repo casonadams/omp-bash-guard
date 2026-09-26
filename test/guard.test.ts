@@ -435,12 +435,23 @@ describe("formatCommandDisplay", () => {
     expect(res).toContain("git status");
   });
 
-  test("formats full multiline command without truncation", () => {
+  test("formats full multiline command under 16 lines without truncation", () => {
     const multiline =
       "echo 1\necho 2\necho 3\necho 4\necho 5\necho 6\necho 7\necho 8\necho 9\necho 10";
     const res = formatCommandDisplay(multiline);
     expect(res).toContain("echo 1");
     expect(res).toContain("echo 10");
+    expect(res).not.toContain("lines truncated");
+  });
+
+  test("safely bounds large multiline commands over 16 lines with head and tail", () => {
+    const lines = Array.from({ length: 30 }, (_, i) => `echo line-${i + 1}`).join("\n");
+    const res = formatCommandDisplay(lines);
+    expect(res).toContain("echo line-1");
+    expect(res).toContain("echo line-12");
+    expect(res).toContain("lines truncated; total 30 lines");
+    expect(res).toContain("echo line-28");
+    expect(res).toContain("echo line-30");
   });
 });
 describe("resolveGuardModel", () => {

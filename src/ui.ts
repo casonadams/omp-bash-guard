@@ -5,7 +5,21 @@ export function formatCommandDisplay(command: string): string {
   const dim = "\x1b[90m";
   const reset = "\x1b[0m";
   const lines = command.split("\n");
+
   if (lines.length > 1) {
+    if (lines.length > 16) {
+      const head = lines.slice(0, 12);
+      const tail = lines.slice(-3);
+      const truncatedNotice = `  ${dim}... (${lines.length - 15} lines truncated; total ${lines.length} lines) ...${reset}`;
+      const headFormatted = head
+        .map((l, i) =>
+          i === 0 ? `  ${dim}$${reset} ${yellow}${l}${reset}` : `    ${yellow}${l}${reset}`,
+        )
+        .join("\n");
+      const tailFormatted = tail.map((l) => `    ${yellow}${l}${reset}`).join("\n");
+      return `Command:\n${headFormatted}\n${truncatedNotice}\n${tailFormatted}`;
+    }
+
     const formatted = lines
       .map((l, i) =>
         i === 0 ? `  ${dim}$${reset} ${yellow}${l}${reset}` : `    ${yellow}${l}${reset}`,
