@@ -135,4 +135,35 @@ describe("registerBashGuard", () => {
         "User denied execution: Critical destructive or irreversible infrastructure action detected.",
     });
   });
+
+  test("blocks execution with feedback when user provides custom input via Other", async () => {
+    let toolCallHandler: ((event: unknown, ctx: unknown) => Promise<unknown>) | undefined;
+    const mockPi = {
+      on: (_event: string, handler: (event: unknown, ctx: unknown) => Promise<unknown>) => {
+        toolCallHandler = handler;
+      },
+    };
+
+    registerBashGuard(mockPi as unknown as Parameters<typeof registerBashGuard>[0]);
+
+    const mockAskDialog = async () => ({
+      kind: "submit",
+      results: [{ selectedOptions: [], customInput: "don't delete production" }],
+    });
+
+    const result = await toolCallHandler!(
+      { toolName: "bash", input: { command: "rm -rf /" } },
+      {
+        hasUI: true,
+        ui: {
+          askDialog: mockAskDialog,
+        },
+      },
+    );
+
+    expect(result).toEqual({
+      block: true,
+      reason: "User blocked with feedback: don't delete production",
+    });
+  });
 });
