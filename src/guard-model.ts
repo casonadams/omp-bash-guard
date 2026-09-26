@@ -26,6 +26,43 @@ export async function resolveGuardModel(ctx?: ExtensionContext): Promise<GuardMo
   return { model, apiKey };
 }
 
+export function parseGuardOutput(text: string): { safe: boolean; reason: string } {
+  const clean = text.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+  const start = clean.indexOf("{");
+  const end = clean.lastIndexOf("}");
+  if (start !== -1 && end > start) {
+    try {
+      const parsed = JSON.parse(clean.slice(start, end + 1)) as { safe?: boolean; reason?: string };
+      if (typeof parsed.safe === "boolean") {
+        return {
+          safe: parsed.safe,
+          reason:
+            typeof parsed.reason === "string" && parsed.reason.trim()
+              ? parsed.reason.trim()
+              : parsed.safe
+                ? "Command verified safe."
+                : "Potential security risk detected.",
+        };
+      }
+    } catch {
+      // Fall through to heuristic recovery below
+    }
+  }
+
+  const lower = clean.toLowerCase();
+  const isSafe =
+    (lower.includes('"safe": true') || lower.includes("safe: true")) && !lower.includes("unsafe");
+  const fallbackReason = clean
+    .replace(/```(?:json)?/gi, "")
+    .replace(/[{}"]/g, "")
+    .trim();
+
+  return {
+    safe: isSafe,
+    reason: fallbackReason || "Action requires human approval.",
+  };
+}
+
 export async function evaluateCommandSafety(
   model: Model<Api>,
   apiKey: string | undefined,
@@ -59,12 +96,9 @@ export async function evaluateCommandSafety(
     const textBlock = response.content.find(
       (b): b is { type: "text"; text: string } => b.type === "text" && typeof b.text === "string",
     );
-    if (!textBlock) throw new Error("No text response received from guard model");
+    if (!textBlock?.text.trim()) throw new Error("No text response received from guard model");
 
-    const jsonMatch = textBlock.text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error("Invalid non-JSON response from guard model");
-
-    return JSON.parse(jsonMatch[0]) as { safe: boolean; reason: string };
+    return parseGuardOutput(textBlock.text);
   } catch (err) {
     return {
       safe: false,

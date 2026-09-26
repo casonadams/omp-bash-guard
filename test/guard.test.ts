@@ -4,6 +4,7 @@ import registerBashGuard, {
   CRITICAL_DANGER_REGEX,
   evaluateCommandSafety,
   formatCommandDisplay,
+  parseGuardOutput,
   resolveGuardModel,
 } from "../index";
 describe("CRITICAL_DANGER_REGEX", () => {
@@ -468,5 +469,33 @@ describe("evaluateCommandSafety", () => {
     const res = await evaluateCommandSafety(mockModel as unknown as Model<Api>, undefined, "ls");
     expect(res.safe).toBe(false);
     expect(res.reason).toContain("Guard model check failed");
+  });
+});
+
+describe("parseGuardOutput", () => {
+  test("parses clean JSON format", () => {
+    const res = parseGuardOutput('{"safe": true, "reason": "read-only"}');
+    expect(res).toEqual({ safe: true, reason: "read-only" });
+  });
+
+  test("strips thinking tags and parses wrapped JSON", () => {
+    const res = parseGuardOutput(
+      '<think>Evaluating...</think>\n{"safe": false, "reason": "deletes cluster pod"}',
+    );
+    expect(res).toEqual({ safe: false, reason: "deletes cluster pod" });
+  });
+
+  test("recovers from malformed JSON quotes inside reason", () => {
+    const res = parseGuardOutput('{"safe": false, "reason": "Command "kubectl" is unsafe"}');
+    expect(res.safe).toBe(false);
+    expect(res.reason).toContain("kubectl");
+  });
+
+  test("recovers safely from plain prose without throwing", () => {
+    const res = parseGuardOutput(
+      "UNSAFE: This command mutates cluster state by terminating a running pod.",
+    );
+    expect(res.safe).toBe(false);
+    expect(res.reason).toContain("mutates cluster state");
   });
 });
