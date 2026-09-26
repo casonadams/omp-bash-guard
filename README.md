@@ -35,6 +35,9 @@ tools:
 
 modelRoles:
   guard: ollama/qwen2.5-coder:7b # Recommended local model (falls back to judge)
+
+marketplace:
+  autoUpdate: notify # Alert when plugin updates are available (off|notify|auto)
 ```
 
 ### Why `approvalMode: yolo`?
@@ -48,6 +51,12 @@ paired with `omp-bash-guard`, you can safely enable `approvalMode: yolo`:
 - **Targeted Interception**: The guard intercepts and pauses execution _only_
   when a command is destructive, mutates cloud or database infrastructure,
   exfiltrates secrets, or poses security risk.
+
+### Plugin Update Notifications
+
+Setting `marketplace.autoUpdate: notify` alerts you whenever updates for
+`omp-bash-guard` are published, ensuring your security heuristics and regex
+rules stay current without silently modifying packages mid-session.
 
 ### Recommended Local Model: `qwen2.5-coder:7b`
 
