@@ -3,16 +3,16 @@ import type { BlockResult, ExtensionContext, ExtensionUIContext } from "./types"
 // Terminal styling palette - customize colors here
 export const THEME = {
   yellow: (text: string) => `\x1b[93;1m${text}\x1b[0m`,
+  white: (text: string) => `\x1b[97;1m${text}\x1b[0m`,
   dim: (text: string) => `\x1b[90m${text}\x1b[0m`,
   bold: (text: string) => `\x1b[1m${text}\x1b[0m`,
-  fg: (text: string) => text,
 };
 
 // Formats the command block (handles single-line and multiline scripts)
 export function formatCommandDisplay(command: string): string {
   const lines = command.split("\n");
   const prefix = (line: string, isFirst: boolean) =>
-    isFirst ? `  ${THEME.dim("$")} ${THEME.yellow(line)}` : `    ${THEME.yellow(line)}`;
+    isFirst ? `  ${THEME.dim("$")} ${THEME.white(line)}` : `    ${THEME.white(line)}`;
 
   if (lines.length <= 1) {
     return `${THEME.dim("Command:")}\n${prefix(command, true)}`;
@@ -37,7 +37,7 @@ export function formatSecurityPrompt(command: string, reason: string): string {
   return [
     THEME.yellow("Bash Guard"),
     THEME.dim("Security Audit:"),
-    `  ${THEME.fg(reason)}`,
+    `  ${THEME.dim(reason)}`,
     "",
     commandBlock,
     "",
