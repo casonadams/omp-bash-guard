@@ -33,6 +33,11 @@ export interface ExtensionUIContext {
     | { kind: string; results: Array<{ selectedOptions: string[]; customInput?: string }> }
     | undefined
   >;
+  editor?(
+    title: string,
+    prefill?: string,
+    options?: { signal?: AbortSignal },
+  ): Promise<string | undefined>;
   confirm?(title: string, message: string, options?: { signal?: AbortSignal }): Promise<boolean>;
   notify?(message: string, level?: "info" | "warning" | "error"): void;
 }

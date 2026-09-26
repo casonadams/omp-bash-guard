@@ -8,38 +8,28 @@ export const THEME = {
   bold: (text: string) => `\x1b[1m${text}\x1b[0m`,
 };
 
-// Formats the command block (handles single-line and multiline scripts)
-export function formatCommandDisplay(command: string): string {
-  const lines = command.split("\n");
-  const prefix = (line: string, isFirst: boolean) =>
-    isFirst ? `  ${THEME.dim("$")} ${THEME.white(line)}` : `    ${THEME.white(line)}`;
+// Formats a clean 1-line reference to the command (full script is already visible in chat transcript above)
+export function formatCommandReference(command: string): string {
+  const lines = command.trim().split("\n");
+  const firstLine = lines[0].length > 70 ? `${lines[0].slice(0, 67)}...` : lines[0];
 
-  if (lines.length <= 1) {
-    return `${THEME.dim("Command:")}\n${prefix(command, true)}`;
+  if (lines.length > 1) {
+    return `${THEME.dim("Target:")} ${THEME.white(firstLine)} ${THEME.dim(`(${lines.length} lines — see above)`)}`;
   }
-
-  if (lines.length <= 16) {
-    const formatted = lines.map((line, i) => prefix(line, i === 0)).join("\n");
-    return `${THEME.dim("Command:")}\n${formatted}`;
-  }
-
-  // Large multiline scripts: show first 12 lines + truncation notice + last 3 lines
-  const head = lines.slice(0, 12).map((l, i) => prefix(l, i === 0));
-  const notice = `  ${THEME.dim(`... (${lines.length - 15} lines truncated; total ${lines.length} lines) ...`)}`;
-  const tail = lines.slice(-3).map((l) => prefix(l, false));
-
-  return `${THEME.dim("Command:")}\n${head.join("\n")}\n${notice}\n${tail.join("\n")}`;
+  return `${THEME.dim("Target:")} ${THEME.white(firstLine)}`;
 }
+
+export const formatCommandDisplay = formatCommandReference;
 
 // Declarative layout of the security alert dialog
 export function formatSecurityPrompt(command: string, reason: string): string {
-  const commandBlock = formatCommandDisplay(command);
+  const targetRef = formatCommandReference(command);
   return [
     THEME.yellow("Bash Guard"),
     THEME.dim("Security Audit:"),
     `  ${THEME.dim(reason)}`,
     "",
-    commandBlock,
+    targetRef,
     "",
     THEME.dim("Allow execution?"),
   ].join("\n");
@@ -89,8 +79,8 @@ async function promptWithAskDialog(
 ): Promise<BlockResult | void> {
   if (typeof ui.askDialog !== "function") return undefined;
 
-  const commandBlock = formatCommandDisplay(command);
-  const question = `**Security Audit:**\n${reason}\n\n${commandBlock}\n\n**Allow execution?**`;
+  const targetRef = formatCommandReference(command);
+  const question = `**Security Audit:**\n${reason}\n\n${targetRef}\n\n**Allow execution?**`;
 
   const res = await ui.askDialog([
     {
@@ -148,10 +138,10 @@ export async function promptUser(
   }
 
   if (typeof ctx.ui?.confirm === "function") {
-    const commandBlock = formatCommandDisplay(command);
+    const targetRef = formatCommandReference(command);
     const approved = await ctx.ui.confirm(
       "Sensitive / Unsafe Command Approval",
-      `Security Audit:\n${reason}\n\n${commandBlock}\n\nAllow execution?`,
+      `Security Audit:\n${reason}\n\n${targetRef}\n\nAllow execution?`,
     );
     if (approved) return;
     return { block: true, reason: `User denied execution: ${reason}` };

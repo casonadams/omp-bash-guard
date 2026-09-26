@@ -104,10 +104,10 @@ describe("registerBashGuard", () => {
     expect(result).toBeUndefined(); // Allowed
     expect(selectTitle).toContain("Bash Guard");
     expect(selectTitle).toContain("Security Audit:");
-    expect(selectTitle).toContain("Command:");
+    expect(selectTitle).toContain("Target:");
     expect(selectTitle).toContain("rm -rf /");
     expect(selectTitle?.indexOf("Security Audit:")).toBeLessThan(
-      selectTitle?.indexOf("Command:") ?? -1,
+      selectTitle?.indexOf("Target:") ?? -1,
     );
     expect(selectOptions).toEqual(["Allow", "Deny with feedback"]);
     expect(selectConfig).toEqual({ initialIndex: 1 });
@@ -219,10 +219,10 @@ describe("registerBashGuard", () => {
       options: Array<{ label: string; preview?: string }>;
     }>;
     expect(questions[0]?.question).toContain("**Security Audit:**");
-    expect(questions[0]?.question).toContain("Command:");
+    expect(questions[0]?.question).toContain("Target:");
     expect(questions[0]?.question).toContain("rm -rf /");
     expect(questions[0]?.question?.indexOf("**Security Audit:**")).toBeLessThan(
-      questions[0]?.question?.indexOf("Command:") ?? -1,
+      questions[0]?.question?.indexOf("Target:") ?? -1,
     );
     expect(questions[0]?.question).toContain("**Allow execution?**");
     expect(questions[0]?.options).toEqual([{ label: "Allow" }, { label: "Deny with feedback" }]);
@@ -263,7 +263,7 @@ describe("registerBashGuard", () => {
       options: Array<{ label: string; preview?: string }>;
     }>;
     expect(questions[0]?.question).toContain("for pod in $(kubectl get pods); do");
-    expect(questions[0]?.question).toContain("kubectl delete pod $pod");
+    expect(questions[0]?.question).toContain("lines — see above");
     expect(questions[0]?.options[0]?.preview).toBeUndefined();
   });
 
@@ -430,30 +430,18 @@ describe("registerBashGuard", () => {
 });
 
 describe("formatCommandDisplay", () => {
-  test("formats single-line command with indentation and prompt prefix", () => {
+  test("formats single-line command reference", () => {
     const res = formatCommandDisplay("git status");
-    expect(res).toContain("Command:");
-    expect(res).toContain("$");
+    expect(res).toContain("Target:");
     expect(res).toContain("git status");
   });
 
-  test("formats full multiline command under 16 lines without truncation", () => {
-    const multiline =
-      "echo 1\necho 2\necho 3\necho 4\necho 5\necho 6\necho 7\necho 8\necho 9\necho 10";
+  test("formats multiline command with line count reference", () => {
+    const multiline = "echo 1\necho 2\necho 3\necho 4\necho 5";
     const res = formatCommandDisplay(multiline);
+    expect(res).toContain("Target:");
     expect(res).toContain("echo 1");
-    expect(res).toContain("echo 10");
-    expect(res).not.toContain("lines truncated");
-  });
-
-  test("safely bounds large multiline commands over 16 lines with head and tail", () => {
-    const lines = Array.from({ length: 30 }, (_, i) => `echo line-${i + 1}`).join("\n");
-    const res = formatCommandDisplay(lines);
-    expect(res).toContain("echo line-1");
-    expect(res).toContain("echo line-12");
-    expect(res).toContain("lines truncated; total 30 lines");
-    expect(res).toContain("echo line-28");
-    expect(res).toContain("echo line-30");
+    expect(res).toContain("5 lines — see above");
   });
 });
 
@@ -466,10 +454,10 @@ describe("formatSecurityPrompt", () => {
     expect(prompt).toContain("Bash Guard");
     expect(prompt).toContain("Security Audit:");
     expect(prompt).toContain("Remote git push alters remote history.");
-    expect(prompt).toContain("Command:");
+    expect(prompt).toContain("Target:");
     expect(prompt).toContain("git push origin main");
     expect(prompt).toContain("Allow execution?");
-    expect(prompt.indexOf("Security Audit:")).toBeLessThan(prompt.indexOf("Command:"));
+    expect(prompt.indexOf("Security Audit:")).toBeLessThan(prompt.indexOf("Target:"));
   });
 });
 
