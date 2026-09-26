@@ -7,17 +7,23 @@ Intercepts bash commands before execution and evaluates their risk against your
 software engineering, cloud infrastructure, and database rules using your
 configured **guard** or **judge** model.
 
+## Quick Install
+
+```bash
+omp plugin install github:casonadams/omp-bash-guard
+```
+
 ## Features
 
 - **Decoupled Model Configuration**: Uses your configured `guard` model role in
   `config.yml` (falls back to `judge`). Works with any provider supported by
   oh-my-pi (Ollama, Anthropic, OpenAI, Gemini, Bedrock, etc.)
-
 - **Fail-Safe Enforcement**: If no guard/judge model is configured or
   credentials are missing, commands cannot run silently; you are prompted with
   an alert.
-- **Interactive TUI Ask Dialog**: Flagged commands present the native oh-my-pi
-  `ask` selection overlay (`Proceed`, `Cancel`, or `Other` for custom feedback).
+- **Interactive TUI Ask Dialog**: Flagged commands present clear options
+  (`Allow`, `Deny with feedback`, or `Other` for custom feedback) with the
+  full command and security audit visible up front.
 - **Zero-Latency Critical Regex**: Instant interception for catastrophic
   patterns (`rm -rf /`, `git reset --hard`, `mkfs`, raw device writes).
 - **Developer-Friendly Boundaries**: Safe local operations (builds, tests,
