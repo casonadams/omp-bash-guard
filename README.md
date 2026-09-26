@@ -21,9 +21,9 @@ omp plugin install github:casonadams/omp-bash-guard
 - **Fail-Safe Enforcement**: If no guard/judge model is configured or
   credentials are missing, commands cannot run silently; you are prompted with
   an alert.
-- **Interactive TUI Ask Dialog**: Flagged commands present clear options
-  (`Allow`, `Deny with feedback`, or `Other` for custom feedback) with the
-  full command and security audit visible up front.
+- **Interactive TUI Ask Dialog**: Flagged commands present the native oh-my-pi
+  ask dialog with scrollable code preview (`Proceed`, `Cancel`, or custom feedback
+  via `Other`).
 - **Zero-Latency Critical Regex**: Instant interception for catastrophic
   patterns (`rm -rf /`, `git reset --hard`, `mkfs`, raw device writes).
 - **Developer-Friendly Boundaries**: Safe local operations (builds, tests,
@@ -63,6 +63,24 @@ paired with `omp-bash-guard`, you can safely enable `approvalMode: yolo`:
 Setting `marketplace.autoUpdate: notify` alerts you whenever updates for
 `omp-bash-guard` are published, ensuring your security heuristics and regex
 rules stay current without silently modifying packages mid-session.
+
+### Keybindings (Vim `j`/`k` & `Tab` Navigation)
+
+By default, oh-my-pi navigates selection dialogs using the arrow keys. To enable
+Vim `j`/`k` and `Tab`/`Shift+Tab` navigation, add the following to
+`~/.omp/agent/keybindings.yml`:
+
+```yaml
+tui.select.up:
+  - Up
+  - k
+  - Shift+Tab
+
+tui.select.down:
+  - Down
+  - j
+  - Tab
+```
 
 ### Recommended Local Model: `qwen2.5-coder:7b`
 
