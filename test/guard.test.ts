@@ -4,8 +4,10 @@ import registerBashGuard, {
   CRITICAL_DANGER_REGEX,
   evaluateCommandSafety,
   formatCommandDisplay,
+  formatSecurityPrompt,
   parseGuardOutput,
   resolveGuardModel,
+  THEME,
 } from "../index";
 describe("CRITICAL_DANGER_REGEX", () => {
   test("flags destructive wipes immediately", () => {
@@ -452,6 +454,31 @@ describe("formatCommandDisplay", () => {
     expect(res).toContain("lines truncated; total 30 lines");
     expect(res).toContain("echo line-28");
     expect(res).toContain("echo line-30");
+  });
+});
+
+describe("formatSecurityPrompt", () => {
+  test("builds prompt with impact first, full command, and allow prompt", () => {
+    const prompt = formatSecurityPrompt(
+      "git push origin main",
+      "Remote git push alters remote history.",
+    );
+    expect(prompt).toContain("Bash Guard");
+    expect(prompt).toContain("Security Audit:");
+    expect(prompt).toContain("Remote git push alters remote history.");
+    expect(prompt).toContain("Command:");
+    expect(prompt).toContain("git push origin main");
+    expect(prompt).toContain("Allow execution?");
+    expect(prompt.indexOf("Security Audit:")).toBeLessThan(prompt.indexOf("Command:"));
+  });
+});
+
+describe("THEME", () => {
+  test("applies styling correctly", () => {
+    expect(THEME.yellow("test")).toContain("\x1b[93;1mtest\x1b[0m");
+    expect(THEME.white("test")).toContain("\x1b[97mtest\x1b[0m");
+    expect(THEME.dim("test")).toContain("\x1b[90mtest\x1b[0m");
+    expect(THEME.bold("test")).toContain("\x1b[1mtest\x1b[0m");
   });
 });
 describe("resolveGuardModel", () => {

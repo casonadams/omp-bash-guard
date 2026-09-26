@@ -1,33 +1,48 @@
 import type { BlockResult, ExtensionContext, ExtensionUIContext } from "./types";
 
+// Terminal styling palette - customize colors here
+export const THEME = {
+  yellow: (text: string) => `\x1b[93;1m${text}\x1b[0m`,
+  white: (text: string) => `\x1b[97m${text}\x1b[0m`,
+  dim: (text: string) => `\x1b[90m${text}\x1b[0m`,
+  bold: (text: string) => `\x1b[1m${text}\x1b[0m`,
+};
+
+// Formats the command block (handles single-line and multiline scripts)
 export function formatCommandDisplay(command: string): string {
-  const yellow = "\x1b[93;1m";
-  const dim = "\x1b[90m";
-  const reset = "\x1b[0m";
   const lines = command.split("\n");
+  const prefix = (line: string, isFirst: boolean) =>
+    isFirst ? `  ${THEME.dim("$")} ${THEME.yellow(line)}` : `    ${THEME.yellow(line)}`;
 
-  if (lines.length > 1) {
-    if (lines.length > 16) {
-      const head = lines.slice(0, 12);
-      const tail = lines.slice(-3);
-      const truncatedNotice = `  ${dim}... (${lines.length - 15} lines truncated; total ${lines.length} lines) ...${reset}`;
-      const headFormatted = head
-        .map((l, i) =>
-          i === 0 ? `  ${dim}$${reset} ${yellow}${l}${reset}` : `    ${yellow}${l}${reset}`,
-        )
-        .join("\n");
-      const tailFormatted = tail.map((l) => `    ${yellow}${l}${reset}`).join("\n");
-      return `${yellow}Command:${reset}\n${headFormatted}\n${truncatedNotice}\n${tailFormatted}`;
-    }
-
-    const formatted = lines
-      .map((l, i) =>
-        i === 0 ? `  ${dim}$${reset} ${yellow}${l}${reset}` : `    ${yellow}${l}${reset}`,
-      )
-      .join("\n");
-    return `${yellow}Command:${reset}\n${formatted}`;
+  if (lines.length <= 1) {
+    return `${THEME.yellow("Command:")}\n${prefix(command, true)}`;
   }
-  return `${yellow}Command:${reset}\n  ${dim}$${reset} ${yellow}${command}${reset}`;
+
+  if (lines.length <= 16) {
+    const formatted = lines.map((line, i) => prefix(line, i === 0)).join("\n");
+    return `${THEME.yellow("Command:")}\n${formatted}`;
+  }
+
+  // Large multiline scripts: show first 12 lines + truncation notice + last 3 lines
+  const head = lines.slice(0, 12).map((l, i) => prefix(l, i === 0));
+  const notice = `  ${THEME.dim(`... (${lines.length - 15} lines truncated; total ${lines.length} lines) ...`)}`;
+  const tail = lines.slice(-3).map((l) => prefix(l, false));
+
+  return `${THEME.yellow("Command:")}\n${head.join("\n")}\n${notice}\n${tail.join("\n")}`;
+}
+
+// Declarative layout of the security alert dialog
+export function formatSecurityPrompt(command: string, reason: string): string {
+  const commandBlock = formatCommandDisplay(command);
+  return [
+    THEME.yellow("Bash Guard"),
+    THEME.yellow("Security Audit:"),
+    `  ${THEME.white(reason)}`,
+    "",
+    commandBlock,
+    "",
+    THEME.yellow("Allow execution?"),
+  ].join("\n");
 }
 
 async function promptWithSelect(
@@ -52,7 +67,7 @@ async function promptWithSelect(
         "e.g. use dry-run or target a different resource",
       );
       if (input === undefined) {
-        continue;
+        continue; // Esc loops back to menu
       }
       const feedback = input.trim();
       return {
@@ -69,10 +84,13 @@ async function promptWithSelect(
 
 async function promptWithAskDialog(
   ui: ExtensionUIContext,
-  question: string,
+  command: string,
   reason: string,
 ): Promise<BlockResult | void> {
   if (typeof ui.askDialog !== "function") return undefined;
+
+  const commandBlock = formatCommandDisplay(command);
+  const question = `**Security Audit:**\n${reason}\n\n${commandBlock}\n\n**Allow execution?**`;
 
   const res = await ui.askDialog([
     {
@@ -120,32 +138,17 @@ export async function promptUser(
     };
   }
 
-  const commandBlock = formatCommandDisplay(command);
-
   if (typeof ctx.ui.select === "function") {
-    const yellow = "\x1b[93;1m";
-    const white = "\x1b[97m";
-    const reset = "\x1b[0m";
-
-    const promptTitle = [
-      `${yellow}Bash Guard${reset}`,
-      `${yellow}Security Audit:${reset}`,
-      `  ${white}${reason}${reset}`,
-      "",
-      commandBlock,
-      "",
-      `${yellow}Allow execution?${reset}`,
-    ].join("\n");
-
+    const promptTitle = formatSecurityPrompt(command, reason);
     return await promptWithSelect(ctx.ui, promptTitle, reason);
   }
 
   if (typeof ctx.ui?.askDialog === "function") {
-    const question = `**Security Audit:**\n${reason}\n\n${commandBlock}\n\n**Allow execution?**`;
-    return await promptWithAskDialog(ctx.ui, question, reason);
+    return await promptWithAskDialog(ctx.ui, command, reason);
   }
 
   if (typeof ctx.ui?.confirm === "function") {
+    const commandBlock = formatCommandDisplay(command);
     const approved = await ctx.ui.confirm(
       "Sensitive / Unsafe Command Approval",
       `Security Audit:\n${reason}\n\n${commandBlock}\n\nAllow execution?`,
