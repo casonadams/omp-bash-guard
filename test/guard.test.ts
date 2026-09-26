@@ -478,7 +478,7 @@ describe("THEME", () => {
     expect(THEME.yellow("test")).toContain("\x1b[93;1mtest\x1b[0m");
     expect(THEME.dim("test")).toContain("\x1b[90mtest\x1b[0m");
     expect(THEME.bold("test")).toContain("\x1b[1mtest\x1b[0m");
-    expect(THEME.white("test")).toContain("\x1b[97;1mtest\x1b[0m");
+    expect(THEME.fg("test")).toBe("test");
   });
 });
 describe("resolveGuardModel", () => {

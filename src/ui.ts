@@ -3,9 +3,9 @@ import type { BlockResult, ExtensionContext, ExtensionUIContext } from "./types"
 // Terminal styling palette - customize colors here
 export const THEME = {
   yellow: (text: string) => `\x1b[93;1m${text}\x1b[0m`,
-  white: (text: string) => `\x1b[97;1m${text}\x1b[0m`,
   dim: (text: string) => `\x1b[90m${text}\x1b[0m`,
   bold: (text: string) => `\x1b[1m${text}\x1b[0m`,
+  fg: (text: string) => text,
 };
 
 // Formats the command block (handles single-line and multiline scripts)
@@ -15,12 +15,12 @@ export function formatCommandDisplay(command: string): string {
     isFirst ? `  ${THEME.dim("$")} ${THEME.yellow(line)}` : `    ${THEME.yellow(line)}`;
 
   if (lines.length <= 1) {
-    return `${THEME.white("Command:")}\n${prefix(command, true)}`;
+    return `${THEME.dim("Command:")}\n${prefix(command, true)}`;
   }
 
   if (lines.length <= 16) {
     const formatted = lines.map((line, i) => prefix(line, i === 0)).join("\n");
-    return `${THEME.white("Command:")}\n${formatted}`;
+    return `${THEME.dim("Command:")}\n${formatted}`;
   }
 
   // Large multiline scripts: show first 12 lines + truncation notice + last 3 lines
@@ -28,7 +28,7 @@ export function formatCommandDisplay(command: string): string {
   const notice = `  ${THEME.dim(`... (${lines.length - 15} lines truncated; total ${lines.length} lines) ...`)}`;
   const tail = lines.slice(-3).map((l) => prefix(l, false));
 
-  return `${THEME.white("Command:")}\n${head.join("\n")}\n${notice}\n${tail.join("\n")}`;
+  return `${THEME.dim("Command:")}\n${head.join("\n")}\n${notice}\n${tail.join("\n")}`;
 }
 
 // Declarative layout of the security alert dialog
@@ -36,12 +36,12 @@ export function formatSecurityPrompt(command: string, reason: string): string {
   const commandBlock = formatCommandDisplay(command);
   return [
     THEME.yellow("Bash Guard"),
-    THEME.white("Security Audit:"),
-    `  ${THEME.dim(reason)}`,
+    THEME.dim("Security Audit:"),
+    `  ${THEME.fg(reason)}`,
     "",
     commandBlock,
     "",
-    THEME.white("Allow execution?"),
+    THEME.dim("Allow execution?"),
   ].join("\n");
 }
 
