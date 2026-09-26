@@ -11,8 +11,8 @@ configured **guard** or **judge** model.
 
 - **Decoupled Model Configuration**: Uses your configured `guard` model role in
   `config.yml` (falls back to `judge`). Works with any provider supported by
-  oh-my-pi (Ollama, Anthropic, OpenAI, Gemini, Bedrock, etc.)—no hardcoded
-  Ollama dependencies.
+  oh-my-pi (Ollama, Anthropic, OpenAI, Gemini, Bedrock, etc.)
+
 - **Fail-Safe Enforcement**: If no guard/judge model is configured or
   credentials are missing, commands cannot run silently; you are prompted with
   an alert.
@@ -30,11 +30,31 @@ In `~/.omp/agent/config.yml`, add a `guard` entry under `modelRoles:`
 
 ```yaml
 modelRoles:
-  guard: ollama/qwen2.5-coder:7b # Or any other model e.g. google-antigravity/gemini-3.8-flash:medium
+  guard: ollama/qwen2.5-coder:7b # Recommended local model
 ```
 
 If `guard` is not set, it will automatically fall back to your `judge` role. If
 neither is set, execution is blocked until you configure one.
+
+### Recommended Local Model: `qwen2.5-coder:7b`
+
+For local, offline command inspection without cloud API latency or cost,
+`ollama/qwen2.5-coder:7b` is strongly recommended for the `guard` role:
+
+- **Domain Comprehension**: Pretrained extensively on code, shell scripts, and
+  DevOps tools (git, kubectl, terraform, docker, cloud CLIs, database clients),
+  enabling accurate discrimination between benign local dev commands and
+  destructive operations.
+- **Low Latency & Small Footprint**: At ~4.7 GB quantized (Q4_K_M), it fits
+  easily into standard Apple Silicon unified memory or consumer GPUs, providing
+  fast classification without perceptible CLI lag.
+- **Reliable Structured Output**: Consistently produces deterministic JSON
+  matching the required schema at `temperature: 0.0` without conversational
+  hallucinations.
+- **Air-Gapped Privacy**: Shell commands, local paths, arguments, and sensitive
+  parameters remain on-device and are never transmitted to third-party endpoints.
+- **Offline Resilience**: Guards remain functional during network outages,
+  disconnected flights, or strict air-gapped enterprise environments.
 
 ## Installation
 
