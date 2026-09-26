@@ -1,0 +1,35 @@
+{
+  "name": "omp-bash-guard",
+  "version": "0.1.0",
+  "description": "Security gatekeeper extension for oh-my-pi shell execution using the configured guard/judge model role",
+  "type": "module",
+  "main": "index.ts",
+  "scripts": {
+    "test": "bun test",
+    "lint": "oxlint",
+    "typecheck": "tsc --noEmit",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "check": "bun run typecheck && bun run lint && bun run format:check && bun run test"
+  },
+  "omp": {
+    "extensions": [
+      "index.ts"
+    ]
+  },
+  "keywords": [
+    "omp-plugin",
+    "oh-my-pi",
+    "security",
+    "guard"
+  ],
+  "dependencies": {
+    "@oh-my-pi/pi-ai": "^18.3.2"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.2",
+    "oxlint": "^1.85.0",
+    "prettier": "^3.9.9",
+    "typescript": "^7.0.2"
+  }
+}
