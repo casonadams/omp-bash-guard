@@ -1,6 +1,6 @@
 {
   "name": "omp-bash-guard",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Security gatekeeper extension for oh-my-pi shell execution using the configured guard/judge model role",
   "type": "module",
   "main": "index.ts",
