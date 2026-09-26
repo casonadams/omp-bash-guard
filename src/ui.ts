@@ -18,7 +18,7 @@ export async function promptUser(
       {
         id: "bash_guard_approval",
         header: "Bash Guard",
-        question: `Security Audit:\n${reason}\n\nAllow execution?`,
+        question: `Security Audit:\n${reason.trim()}\n \nAllow execution?`,
         recommended: 1,
         options: [
           {
