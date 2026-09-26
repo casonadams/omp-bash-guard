@@ -17,7 +17,7 @@ export function formatCommandDisplay(command: string): string {
         )
         .join("\n");
       const tailFormatted = tail.map((l) => `    ${yellow}${l}${reset}`).join("\n");
-      return `Command:\n${headFormatted}\n${truncatedNotice}\n${tailFormatted}`;
+      return `${yellow}Command:${reset}\n${headFormatted}\n${truncatedNotice}\n${tailFormatted}`;
     }
 
     const formatted = lines
@@ -25,9 +25,9 @@ export function formatCommandDisplay(command: string): string {
         i === 0 ? `  ${dim}$${reset} ${yellow}${l}${reset}` : `    ${yellow}${l}${reset}`,
       )
       .join("\n");
-    return `Command:\n${formatted}`;
+    return `${yellow}Command:${reset}\n${formatted}`;
   }
-  return `Command:\n  ${dim}$${reset} ${yellow}${command}${reset}`;
+  return `${yellow}Command:${reset}\n  ${dim}$${reset} ${yellow}${command}${reset}`;
 }
 
 async function promptWithSelect(
@@ -123,18 +123,18 @@ export async function promptUser(
   const commandBlock = formatCommandDisplay(command);
 
   if (typeof ctx.ui.select === "function") {
-    const bold = "\x1b[1m";
+    const yellow = "\x1b[93;1m";
     const white = "\x1b[97m";
     const reset = "\x1b[0m";
 
     const promptTitle = [
-      "Bash Guard",
-      `${bold}Security Audit:${reset}`,
+      `${yellow}Bash Guard${reset}`,
+      `${yellow}Security Audit:${reset}`,
       `  ${white}${reason}${reset}`,
       "",
-      `${bold}${commandBlock}${reset}`,
+      commandBlock,
       "",
-      `${bold}Allow execution?${reset}`,
+      `${yellow}Allow execution?${reset}`,
     ].join("\n");
 
     return await promptWithSelect(ctx.ui, promptTitle, reason);
