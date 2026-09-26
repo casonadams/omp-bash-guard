@@ -80,28 +80,52 @@ For local, offline command inspection without cloud API latency or cost,
 
 ## Installation
 
-### Via Marketplace (Recommended)
+### Method 1: Via Marketplace (Recommended)
 
-Add the marketplace catalog:
+1. **Add the marketplace catalog**:
 
-```bash
-omp plugin marketplace add casonadams/omp-plugins
-```
+   ```bash
+   omp plugin marketplace add casonadams/omp-plugins
+   ```
 
-Install the plugin:
+   _(Or inside an active session: `/marketplace add casonadams/omp-plugins`)_
 
-```bash
-omp plugin install omp-bash-guard@casonadams-plugins
-```
+2. **Browse available plugins** (optional):
 
-### Direct Git Install
+   ```bash
+   omp plugin discover
+   ```
+
+3. **Install the plugin**:
+   ```bash
+   omp plugin install omp-bash-guard@casonadams-plugins
+   ```
+   _Note: If you previously installed directly via GitHub, use `--force` to switch tracking to the marketplace catalog:_
+   ```bash
+   omp plugin install omp-bash-guard@casonadams-plugins --force
+   ```
+
+### Method 2: Direct Git Install
+
+Install directly without adding a marketplace catalog:
 
 ```bash
 omp plugin install github:casonadams/omp-bash-guard
 ```
 
-### Local Development
+### Method 3: Local Development Link
+
+Link local working directory:
 
 ```bash
 omp plugin link /path/to/omp-bash-guard
+```
+
+## Verification
+
+Verify that the plugin is installed and healthy:
+
+```bash
+omp plugin list
+omp plugin doctor
 ```
