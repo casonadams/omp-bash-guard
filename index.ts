@@ -97,21 +97,34 @@ export default function (pi: PiExtensionAPI) {
       const promptUserOrBlock = async (reason: string): Promise<BlockResult | void> => {
         if (ctx?.hasUI) {
           if (typeof ctx.ui?.askDialog === "function") {
+            const singleLineCommand = command.includes("\n")
+              ? `${command.split("\n")[0]} ...`
+              : command;
+            const displayCommand =
+              singleLineCommand.length > 80
+                ? `${singleLineCommand.slice(0, 77)}...`
+                : singleLineCommand;
+            const safeCommand = displayCommand.replace(/`/g, "'");
+
+            const question = `**Command:** \`${safeCommand}\`\n**Security Audit:** ${reason}\n**Allow execution?**`;
+            const fullPreview = `### Command\n\`\`\`bash\n${command}\n\`\`\`\n\n### Security Audit\n${reason}`;
+
             const res = await ctx.ui.askDialog([
               {
                 id: "bash_guard_approval",
                 header: "Bash Guard",
-                question: `Command flagged by Bash Guard:\n\`\`\`bash\n${command}\n\`\`\`\n**Security Audit:** ${reason}\n\nDo you want to proceed with execution?`,
+                question,
                 recommended: 1, // Default cursor on Cancel for safety
                 options: [
                   {
                     label: "Proceed",
                     description: "Execute the command as requested",
-                    preview: command,
+                    preview: fullPreview,
                   },
                   {
                     label: "Cancel",
                     description: "Block execution of this command",
+                    preview: fullPreview,
                   },
                 ],
               },

@@ -62,4 +62,78 @@ describe("registerBashGuard", () => {
         "[Bash Guard] Blocked unsafe command (headless mode): No guard or judge model configured! Set `modelRoles.guard: <provider/model>` (or `modelRoles.judge`) in ~/.omp/agent/config.yml before executing shell commands.",
     });
   });
+
+  test("formats askDialog with single-paragraph question and full preview", async () => {
+    let toolCallHandler: ((event: unknown, ctx: unknown) => Promise<unknown>) | undefined;
+    const mockPi = {
+      on: (_event: string, handler: (event: unknown, ctx: unknown) => Promise<unknown>) => {
+        toolCallHandler = handler;
+      },
+    };
+
+    registerBashGuard(mockPi as unknown as Parameters<typeof registerBashGuard>[0]);
+
+    let dialogArg: unknown;
+    const mockAskDialog = async (questions: unknown) => {
+      dialogArg = questions;
+      return {
+        kind: "submit",
+        results: [{ selectedOptions: ["Proceed"] }],
+      };
+    };
+
+    const result = await toolCallHandler!(
+      { toolName: "bash", input: { command: "rm -rf /" } },
+      {
+        hasUI: true,
+        ui: {
+          askDialog: mockAskDialog,
+        },
+      },
+    );
+
+    expect(result).toBeUndefined(); // Allowed to proceed
+    expect(Array.isArray(dialogArg)).toBe(true);
+    const questions = dialogArg as Array<{
+      question: string;
+      options: Array<{ label: string; preview?: string }>;
+    }>;
+    expect(questions[0]?.question).toContain("**Command:** `rm -rf /`");
+    expect(questions[0]?.question).toContain("**Security Audit:**");
+    expect(questions[0]?.question).toContain("**Allow execution?**");
+    expect(questions[0]?.options[0]?.preview).toContain("### Command\n```bash\nrm -rf /\n```");
+    expect(questions[0]?.options[1]?.preview).toContain("### Command\n```bash\nrm -rf /\n```");
+  });
+
+  test("blocks execution when askDialog is cancelled", async () => {
+    let toolCallHandler: ((event: unknown, ctx: unknown) => Promise<unknown>) | undefined;
+    const mockPi = {
+      on: (_event: string, handler: (event: unknown, ctx: unknown) => Promise<unknown>) => {
+        toolCallHandler = handler;
+      },
+    };
+
+    registerBashGuard(mockPi as unknown as Parameters<typeof registerBashGuard>[0]);
+
+    const mockAskDialog = async () => ({
+      kind: "submit",
+      results: [{ selectedOptions: ["Cancel"] }],
+    });
+
+    const result = await toolCallHandler!(
+      { toolName: "bash", input: { command: "rm -rf /" } },
+      {
+        hasUI: true,
+        ui: {
+          askDialog: mockAskDialog,
+        },
+      },
+    );
+
+    expect(result).toEqual({
+      block: true,
+      reason:
+        "User denied execution: Critical destructive or irreversible infrastructure action detected.",
+    });
+  });
 });
