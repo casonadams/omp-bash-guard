@@ -97,14 +97,13 @@ export default function (pi: PiExtensionAPI) {
       const promptUserOrBlock = async (reason: string): Promise<BlockResult | void> => {
         if (ctx?.hasUI) {
           if (typeof ctx.ui?.askDialog === "function") {
-            const singleLineCommand = command.includes("\n")
-              ? `${command.split("\n")[0]} ...`
-              : command;
-            const displayCommand =
-              singleLineCommand.length > 80
-                ? `${singleLineCommand.slice(0, 77)}...`
-                : singleLineCommand;
-            const safeCommand = displayCommand.replace(/`/g, "'");
+            const isMultiline = command.includes("\n");
+            const headerCommand = isMultiline
+              ? `${command.split("\n")[0].slice(0, 60)} ... (multiline)`
+              : command.length > 80
+                ? `${command.slice(0, 77)}...`
+                : command;
+            const safeCommand = headerCommand.replace(/`/g, "'");
 
             const question = `**Command:** \`${safeCommand}\`\n**Security Audit:** ${reason}\n**Allow execution?**`;
 
@@ -114,7 +113,13 @@ export default function (pi: PiExtensionAPI) {
                 header: "Bash Guard",
                 question,
                 recommended: 1, // Default cursor on Cancel for safety
-                options: [{ label: "Proceed" }, { label: "Cancel" }],
+                options: [
+                  {
+                    label: "Proceed",
+                    preview: `\`\`\`bash\n${command}\n\`\`\``,
+                  },
+                  { label: "Cancel" },
+                ],
               },
             ]);
 

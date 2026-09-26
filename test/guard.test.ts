@@ -101,7 +101,49 @@ describe("registerBashGuard", () => {
     expect(questions[0]?.question).toContain("**Command:** `rm -rf /`");
     expect(questions[0]?.question).toContain("**Security Audit:**");
     expect(questions[0]?.question).toContain("**Allow execution?**");
-    expect(questions[0]?.options).toEqual([{ label: "Proceed" }, { label: "Cancel" }]);
+    expect(questions[0]?.options).toEqual([
+      { label: "Proceed", preview: "```bash\nrm -rf /\n```" },
+      { label: "Cancel" },
+    ]);
+  });
+
+  test("formats multiline commands with (multiline) in header and full script in Proceed preview", async () => {
+    let toolCallHandler: ((event: unknown, ctx: unknown) => Promise<unknown>) | undefined;
+    const mockPi = {
+      on: (_event: string, handler: (event: unknown, ctx: unknown) => Promise<unknown>) => {
+        toolCallHandler = handler;
+      },
+    };
+
+    registerBashGuard(mockPi as unknown as Parameters<typeof registerBashGuard>[0]);
+
+    let dialogArg: unknown;
+    const mockAskDialog = async (questions: unknown) => {
+      dialogArg = questions;
+      return {
+        kind: "submit",
+        results: [{ selectedOptions: ["Proceed"] }],
+      };
+    };
+
+    const multilineCmd = "for pod in $(kubectl get pods); do\n  kubectl delete pod $pod\ndone";
+    await toolCallHandler!(
+      { toolName: "bash", input: { command: multilineCmd } },
+      {
+        hasUI: true,
+        ui: {
+          askDialog: mockAskDialog,
+        },
+      },
+    );
+
+    const questions = dialogArg as Array<{
+      question: string;
+      options: Array<{ label: string; preview?: string }>;
+    }>;
+    expect(questions[0]?.question).toContain("(multiline)");
+    expect(questions[0]?.options[0]?.preview).toBe(`\`\`\`bash\n${multilineCmd}\n\`\`\``);
+    expect(questions[0]?.options[1]?.preview).toBeUndefined();
   });
 
   test("blocks execution when askDialog is cancelled", async () => {
