@@ -43,7 +43,10 @@ export async function evaluateCommandSafety(
           {
             role: "user",
             content: [
-              { type: "text", text: `Command to evaluate:\n\`\`\`bash\n${command}\n\`\`\`` },
+              {
+                type: "text",
+                text: `<command_to_evaluate>\n${command}\n</command_to_evaluate>`,
+              },
             ],
             timestamp: Date.now(),
           },
