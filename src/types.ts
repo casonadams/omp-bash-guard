@@ -26,9 +26,9 @@ export interface ExtensionUIContext {
       id: string;
       header?: string;
       question: string;
-      options: Array<{ label: string }>;
+      recommended?: number;
+      options: Array<{ label: string; description?: string; preview?: string }>;
     }>,
-    dialogOptions?: { signal?: AbortSignal },
   ): Promise<
     | { kind: string; results: Array<{ selectedOptions: string[]; customInput?: string }> }
     | undefined

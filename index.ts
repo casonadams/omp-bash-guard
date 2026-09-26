@@ -6,7 +6,7 @@ import { promptUser } from "./src/ui";
 export { CRITICAL_DANGER_REGEX, GUARD_SYSTEM_PROMPT } from "./src/constants";
 export { evaluateCommandSafety, parseGuardOutput, resolveGuardModel } from "./src/guard-model";
 export type * from "./src/types";
-export { formatCommandDisplay, formatSecurityPrompt, promptUser, THEME } from "./src/ui";
+export { promptUser } from "./src/ui";
 
 export default function registerBashGuard(pi: PiExtensionAPI) {
   pi.on(
@@ -25,7 +25,6 @@ export default function registerBashGuard(pi: PiExtensionAPI) {
           "Critical destructive or irreversible infrastructure action detected.",
         );
       }
-
       const guard = await resolveGuardModel(ctx);
       if ("block" in guard) {
         return promptUser(ctx, command, guard.reason);

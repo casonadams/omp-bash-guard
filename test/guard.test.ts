@@ -3,11 +3,8 @@ import { describe, expect, test } from "bun:test";
 import registerBashGuard, {
   CRITICAL_DANGER_REGEX,
   evaluateCommandSafety,
-  formatCommandDisplay,
-  formatSecurityPrompt,
   parseGuardOutput,
   resolveGuardModel,
-  THEME,
 } from "../index";
 describe("CRITICAL_DANGER_REGEX", () => {
   test("flags destructive wipes immediately", () => {
@@ -70,120 +67,7 @@ describe("registerBashGuard", () => {
         "[Bash Guard] Blocked unsafe command (headless mode): No guard or judge model configured! Set `modelRoles.guard: <provider/model>` (or `modelRoles.judge`) in ~/.omp/agent/config.yml before executing shell commands.",
     });
   });
-
-  test("uses ctx.ui.select for a compact 2-option prompt without Other or Recommended", async () => {
-    let toolCallHandler: ((event: unknown, ctx: unknown) => Promise<unknown>) | undefined;
-    const mockPi = {
-      on: (_event: string, handler: (event: unknown, ctx: unknown) => Promise<unknown>) => {
-        toolCallHandler = handler;
-      },
-    };
-
-    registerBashGuard(mockPi as unknown as Parameters<typeof registerBashGuard>[0]);
-
-    let selectTitle: string | undefined;
-    let selectOptions: unknown;
-    let selectConfig: unknown;
-    const mockSelect = async (title: string, options: unknown, config: unknown) => {
-      selectTitle = title;
-      selectOptions = options;
-      selectConfig = config;
-      return "Allow";
-    };
-
-    const result = await toolCallHandler!(
-      { toolName: "bash", input: { command: "rm -rf /" } },
-      {
-        hasUI: true,
-        ui: {
-          select: mockSelect,
-        },
-      },
-    );
-
-    expect(result).toBeUndefined(); // Allowed
-    expect(selectTitle).toContain("Bash Guard");
-    expect(selectTitle).toContain("Security Audit:");
-    expect(selectTitle).toContain("Target:");
-    expect(selectTitle).toContain("rm -rf /");
-    expect(selectTitle?.indexOf("Security Audit:")).toBeLessThan(
-      selectTitle?.indexOf("Target:") ?? -1,
-    );
-    expect(selectOptions).toEqual(["Allow", "Deny with feedback"]);
-    expect(selectConfig).toEqual({ initialIndex: 1 });
-  });
-
-  test("ctx.ui.select prompts for feedback when Deny with feedback is selected", async () => {
-    let toolCallHandler: ((event: unknown, ctx: unknown) => Promise<unknown>) | undefined;
-    const mockPi = {
-      on: (_event: string, handler: (event: unknown, ctx: unknown) => Promise<unknown>) => {
-        toolCallHandler = handler;
-      },
-    };
-
-    registerBashGuard(mockPi as unknown as Parameters<typeof registerBashGuard>[0]);
-
-    const mockSelect = async () => "Deny with feedback";
-    const mockInput = async () => "run in sandbox instead";
-
-    const result = await toolCallHandler!(
-      { toolName: "bash", input: { command: "rm -rf /" } },
-      {
-        hasUI: true,
-        ui: {
-          select: mockSelect,
-          input: mockInput,
-        },
-      },
-    );
-
-    expect(result).toEqual({
-      block: true,
-      reason: "User denied execution with feedback: run in sandbox instead",
-    });
-  });
-
-  test("ctx.ui.select loops back to menu when Esc is pressed in feedback input", async () => {
-    let toolCallHandler: ((event: unknown, ctx: unknown) => Promise<unknown>) | undefined;
-    const mockPi = {
-      on: (_event: string, handler: (event: unknown, ctx: unknown) => Promise<unknown>) => {
-        toolCallHandler = handler;
-      },
-    };
-
-    registerBashGuard(mockPi as unknown as Parameters<typeof registerBashGuard>[0]);
-
-    let selectCount = 0;
-    const mockSelect = async () => {
-      selectCount++;
-      // First pick "Deny with feedback", second time pick "Allow" after Esc
-      return selectCount === 1 ? "Deny with feedback" : "Allow";
-    };
-
-    let inputCount = 0;
-    const mockInput = async () => {
-      inputCount++;
-      // User pressed Esc (returns undefined)
-      return undefined;
-    };
-
-    const result = await toolCallHandler!(
-      { toolName: "bash", input: { command: "rm -rf /" } },
-      {
-        hasUI: true,
-        ui: {
-          select: mockSelect,
-          input: mockInput,
-        },
-      },
-    );
-
-    expect(selectCount).toBe(2); // Looped back to menu!
-    expect(inputCount).toBe(1);
-    expect(result).toBeUndefined(); // Allowed on second attempt
-  });
-
-  test("formats askDialog fallback with single-paragraph question and Allow / Deny with feedback options", async () => {
+  test("presents askDialog with question, recommended Cancel, and Proceed preview with scroller", async () => {
     let toolCallHandler: ((event: unknown, ctx: unknown) => Promise<unknown>) | undefined;
     const mockPi = {
       on: (_event: string, handler: (event: unknown, ctx: unknown) => Promise<unknown>) => {
@@ -198,7 +82,7 @@ describe("registerBashGuard", () => {
       dialogArg = questions;
       return {
         kind: "submit",
-        results: [{ selectedOptions: ["Allow"] }],
+        results: [{ selectedOptions: ["Proceed"] }],
       };
     };
 
@@ -215,97 +99,19 @@ describe("registerBashGuard", () => {
     expect(result).toBeUndefined(); // Allowed to proceed
     expect(Array.isArray(dialogArg)).toBe(true);
     const questions = dialogArg as Array<{
+      header?: string;
       question: string;
-      options: Array<{ label: string; preview?: string }>;
+      recommended?: number;
+      options: Array<{ label: string; description?: string; preview?: string }>;
     }>;
-    expect(questions[0]?.question).toContain("**Security Audit:**");
-    expect(questions[0]?.question).toContain("Target:");
-    expect(questions[0]?.question).toContain("rm -rf /");
-    expect(questions[0]?.question?.indexOf("**Security Audit:**")).toBeLessThan(
-      questions[0]?.question?.indexOf("Target:") ?? -1,
-    );
-    expect(questions[0]?.question).toContain("**Allow execution?**");
-    expect(questions[0]?.options).toEqual([{ label: "Allow" }, { label: "Deny with feedback" }]);
+    expect(questions[0]?.header).toBe("Bash Guard");
+    expect(questions[0]?.question).toContain("Security Audit:");
+    expect(questions[0]?.question).toContain("Allow execution?");
+    expect(questions[0]?.recommended).toBe(1);
+    expect(questions[0]?.options[0]?.label).toBe("Proceed");
+    expect(questions[0]?.options[0]?.preview).toBe("```bash\nrm -rf /\n```");
+    expect(questions[0]?.options[1]?.label).toBe("Cancel");
   });
-
-  test("formats multiline commands directly in Command block without preview clutter", async () => {
-    let toolCallHandler: ((event: unknown, ctx: unknown) => Promise<unknown>) | undefined;
-    const mockPi = {
-      on: (_event: string, handler: (event: unknown, ctx: unknown) => Promise<unknown>) => {
-        toolCallHandler = handler;
-      },
-    };
-
-    registerBashGuard(mockPi as unknown as Parameters<typeof registerBashGuard>[0]);
-
-    let dialogArg: unknown;
-    const mockAskDialog = async (questions: unknown) => {
-      dialogArg = questions;
-      return {
-        kind: "submit",
-        results: [{ selectedOptions: ["Allow"] }],
-      };
-    };
-
-    const multilineCmd = "for pod in $(kubectl get pods); do\n  kubectl delete pod $pod\ndone";
-    await toolCallHandler!(
-      { toolName: "bash", input: { command: multilineCmd } },
-      {
-        hasUI: true,
-        ui: {
-          askDialog: mockAskDialog,
-        },
-      },
-    );
-
-    const questions = dialogArg as Array<{
-      question: string;
-      options: Array<{ label: string; preview?: string }>;
-    }>;
-    expect(questions[0]?.question).toContain("for pod in $(kubectl get pods); do");
-    expect(questions[0]?.question).toContain("lines — see above");
-    expect(questions[0]?.options[0]?.preview).toBeUndefined();
-  });
-
-  test("prompts for optional feedback when Deny with feedback is selected", async () => {
-    let toolCallHandler: ((event: unknown, ctx: unknown) => Promise<unknown>) | undefined;
-    const mockPi = {
-      on: (_event: string, handler: (event: unknown, ctx: unknown) => Promise<unknown>) => {
-        toolCallHandler = handler;
-      },
-    };
-
-    registerBashGuard(mockPi as unknown as Parameters<typeof registerBashGuard>[0]);
-
-    const mockAskDialog = async () => ({
-      kind: "submit",
-      results: [{ selectedOptions: ["Deny with feedback"] }],
-    });
-
-    let inputPromptAsked = false;
-    const mockInput = async () => {
-      inputPromptAsked = true;
-      return "use dry-run mode";
-    };
-
-    const result = await toolCallHandler!(
-      { toolName: "bash", input: { command: "rm -rf /" } },
-      {
-        hasUI: true,
-        ui: {
-          askDialog: mockAskDialog,
-          input: mockInput,
-        },
-      },
-    );
-
-    expect(inputPromptAsked).toBe(true);
-    expect(result).toEqual({
-      block: true,
-      reason: "User denied execution with feedback: use dry-run mode",
-    });
-  });
-
   test("blocks execution when askDialog is cancelled", async () => {
     let toolCallHandler: ((event: unknown, ctx: unknown) => Promise<unknown>) | undefined;
     const mockPi = {
@@ -429,46 +235,6 @@ describe("registerBashGuard", () => {
   });
 });
 
-describe("formatCommandDisplay", () => {
-  test("formats single-line command reference", () => {
-    const res = formatCommandDisplay("git status");
-    expect(res).toContain("Target:");
-    expect(res).toContain("git status");
-  });
-
-  test("formats multiline command with line count reference", () => {
-    const multiline = "echo 1\necho 2\necho 3\necho 4\necho 5";
-    const res = formatCommandDisplay(multiline);
-    expect(res).toContain("Target:");
-    expect(res).toContain("echo 1");
-    expect(res).toContain("5 lines — see above");
-  });
-});
-
-describe("formatSecurityPrompt", () => {
-  test("builds prompt with impact first, full command, and allow prompt", () => {
-    const prompt = formatSecurityPrompt(
-      "git push origin main",
-      "Remote git push alters remote history.",
-    );
-    expect(prompt).toContain("Bash Guard");
-    expect(prompt).toContain("Security Audit:");
-    expect(prompt).toContain("Remote git push alters remote history.");
-    expect(prompt).toContain("Target:");
-    expect(prompt).toContain("git push origin main");
-    expect(prompt).toContain("Allow execution?");
-    expect(prompt.indexOf("Security Audit:")).toBeLessThan(prompt.indexOf("Target:"));
-  });
-});
-
-describe("THEME", () => {
-  test("applies styling correctly", () => {
-    expect(THEME.yellow("test")).toContain("\x1b[93;1mtest\x1b[0m");
-    expect(THEME.dim("test")).toContain("\x1b[90mtest\x1b[0m");
-    expect(THEME.bold("test")).toContain("\x1b[1mtest\x1b[0m");
-    expect(THEME.white("test")).toContain("\x1b[97;1mtest\x1b[0m");
-  });
-});
 describe("resolveGuardModel", () => {
   test("resolves guard model when available", async () => {
     const mockModel = { id: "test-model", provider: "ollama", api: "local-inference" } as const;
