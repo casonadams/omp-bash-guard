@@ -100,8 +100,11 @@ describe("registerBashGuard", () => {
 
     expect(result).toBeUndefined(); // Allowed
     expect(selectTitle).toContain("Bash Guard");
-    expect(selectTitle).toContain("Command: rm -rf /");
     expect(selectTitle).toContain("Security Audit:");
+    expect(selectTitle).toContain("Command:\n  rm -rf /");
+    expect(selectTitle?.indexOf("Security Audit:")).toBeLessThan(
+      selectTitle?.indexOf("Command:") ?? -1,
+    );
     expect(selectOptions).toEqual(["Allow", "Deny with feedback"]);
     expect(selectConfig).toEqual({ initialIndex: 1 });
   });
@@ -134,6 +137,46 @@ describe("registerBashGuard", () => {
       block: true,
       reason: "User denied execution with feedback: run in sandbox instead",
     });
+  });
+
+  test("ctx.ui.select loops back to menu when Esc is pressed in feedback input", async () => {
+    let toolCallHandler: ((event: unknown, ctx: unknown) => Promise<unknown>) | undefined;
+    const mockPi = {
+      on: (_event: string, handler: (event: unknown, ctx: unknown) => Promise<unknown>) => {
+        toolCallHandler = handler;
+      },
+    };
+
+    registerBashGuard(mockPi as unknown as Parameters<typeof registerBashGuard>[0]);
+
+    let selectCount = 0;
+    const mockSelect = async () => {
+      selectCount++;
+      // First pick "Deny with feedback", second time pick "Allow" after Esc
+      return selectCount === 1 ? "Deny with feedback" : "Allow";
+    };
+
+    let inputCount = 0;
+    const mockInput = async () => {
+      inputCount++;
+      // User pressed Esc (returns undefined)
+      return undefined;
+    };
+
+    const result = await toolCallHandler!(
+      { toolName: "bash", input: { command: "rm -rf /" } },
+      {
+        hasUI: true,
+        ui: {
+          select: mockSelect,
+          input: mockInput,
+        },
+      },
+    );
+
+    expect(selectCount).toBe(2); // Looped back to menu!
+    expect(inputCount).toBe(1);
+    expect(result).toBeUndefined(); // Allowed on second attempt
   });
 
   test("formats askDialog fallback with single-paragraph question and Allow / Deny with feedback options", async () => {
@@ -171,8 +214,11 @@ describe("registerBashGuard", () => {
       question: string;
       options: Array<{ label: string; preview?: string }>;
     }>;
-    expect(questions[0]?.question).toContain("Command: rm -rf /");
     expect(questions[0]?.question).toContain("**Security Audit:**");
+    expect(questions[0]?.question).toContain("Command:\n  rm -rf /");
+    expect(questions[0]?.question?.indexOf("**Security Audit:**")).toBeLessThan(
+      questions[0]?.question?.indexOf("Command:") ?? -1,
+    );
     expect(questions[0]?.question).toContain("**Allow execution?**");
     expect(questions[0]?.options).toEqual([{ label: "Allow" }, { label: "Deny with feedback" }]);
   });
@@ -379,27 +425,16 @@ describe("registerBashGuard", () => {
 });
 
 describe("formatCommandDisplay", () => {
-  test("formats short single-line command", () => {
-    expect(formatCommandDisplay("git status")).toBe("Command: git status");
+  test("formats single-line command with indentation", () => {
+    expect(formatCommandDisplay("git status")).toBe("Command:\n  git status");
   });
 
-  test("truncates long single-line command", () => {
-    const longCmd = "a".repeat(110);
-    const res = formatCommandDisplay(longCmd);
-    expect(res).toContain("...");
-    expect(res.length).toBeLessThan(longCmd.length);
-  });
-
-  test("formats short multiline command", () => {
-    const multiline = "echo 1\necho 2\necho 3";
+  test("formats full multiline command without truncation", () => {
+    const multiline =
+      "echo 1\necho 2\necho 3\necho 4\necho 5\necho 6\necho 7\necho 8\necho 9\necho 10";
     const res = formatCommandDisplay(multiline);
-    expect(res).toBe("Command:\n  echo 1\n  echo 2\n  echo 3");
-  });
-
-  test("truncates multiline command over 8 lines", () => {
-    const lines = Array.from({ length: 12 }, (_, i) => `cmd ${i + 1}`).join("\n");
-    const res = formatCommandDisplay(lines);
-    expect(res).toContain("more lines");
+    expect(res).toContain("echo 1");
+    expect(res).toContain("echo 10");
   });
 });
 describe("resolveGuardModel", () => {
