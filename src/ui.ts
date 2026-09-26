@@ -110,14 +110,13 @@ export async function promptUser(
 
   if (typeof ctx.ui.select === "function") {
     const bold = "\x1b[1m";
-    const warn = "\x1b[38;5;208;1m";
     const white = "\x1b[97m";
     const reset = "\x1b[0m";
 
     const promptTitle = [
       "Bash Guard",
       `${bold}Security Audit:${reset}`,
-      `  ${warn}⚠${reset} ${white}${reason}${reset}`,
+      `  ${white}${reason}${reset}`,
       "",
       `${bold}${commandBlock}${reset}`,
       "",
@@ -128,13 +127,13 @@ export async function promptUser(
   }
 
   if (typeof ctx.ui?.askDialog === "function") {
-    const question = `**Security Audit:**\n⚠ ${reason}\n\n${commandBlock}\n\n**Allow execution?**`;
+    const question = `**Security Audit:**\n${reason}\n\n${commandBlock}\n\n**Allow execution?**`;
     return await promptWithAskDialog(ctx.ui, question, reason);
   }
 
   if (typeof ctx.ui?.confirm === "function") {
     const approved = await ctx.ui.confirm(
-      "⚠️ Sensitive / Unsafe Command Approval",
+      "Sensitive / Unsafe Command Approval",
       `Security Audit:\n${reason}\n\n${commandBlock}\n\nAllow execution?`,
     );
     if (approved) return;
