@@ -26,15 +26,28 @@ configured **guard** or **judge** model.
 
 ## Configuration
 
-In `~/.omp/agent/config.yml`, add a `guard` entry under `modelRoles:`
+Configure your `~/.omp/agent/config.yml` with `approvalMode: yolo` alongside the
+`guard` model role:
 
 ```yaml
+tools:
+  approvalMode: yolo
+
 modelRoles:
-  guard: ollama/qwen2.5-coder:7b # Recommended local model
+  guard: ollama/qwen2.5-coder:7b # Recommended local model (falls back to judge)
 ```
 
-If `guard` is not set, it will automatically fall back to your `judge` role. If
-neither is set, execution is blocked until you configure one.
+### Why `approvalMode: yolo`?
+
+By default, oh-my-pi prompts for manual human approval on tool executions. When
+paired with `omp-bash-guard`, you can safely enable `approvalMode: yolo`:
+
+- **Zero Interruption for Safe Work**: Benign developer actions (builds, tests,
+  linters, git inspections, file edits) execute instantly without manual confirm
+  prompts.
+- **Targeted Interception**: The guard intercepts and pauses execution _only_
+  when a command is destructive, mutates cloud or database infrastructure,
+  exfiltrates secrets, or poses security risk.
 
 ### Recommended Local Model: `qwen2.5-coder:7b`
 
