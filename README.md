@@ -129,3 +129,18 @@ Verify that the plugin is installed and healthy:
 omp plugin list
 omp plugin doctor
 ```
+
+## Upgrading
+
+Upgrade to the latest release:
+
+```bash
+# For marketplace installs
+omp plugin upgrade omp-bash-guard@casonadams-plugins
+
+# Or upgrade all marketplace plugins
+omp plugin upgrade
+
+# For direct git installs
+omp plugin install github:casonadams/omp-bash-guard --force
+```
