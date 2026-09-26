@@ -102,7 +102,8 @@ describe("registerBashGuard", () => {
     expect(result).toBeUndefined(); // Allowed
     expect(selectTitle).toContain("Bash Guard");
     expect(selectTitle).toContain("Security Audit:");
-    expect(selectTitle).toContain("Command:\n  rm -rf /");
+    expect(selectTitle).toContain("Command:");
+    expect(selectTitle).toContain("rm -rf /");
     expect(selectTitle?.indexOf("Security Audit:")).toBeLessThan(
       selectTitle?.indexOf("Command:") ?? -1,
     );
@@ -216,7 +217,8 @@ describe("registerBashGuard", () => {
       options: Array<{ label: string; preview?: string }>;
     }>;
     expect(questions[0]?.question).toContain("**Security Audit:**");
-    expect(questions[0]?.question).toContain("Command:\n  rm -rf /");
+    expect(questions[0]?.question).toContain("Command:");
+    expect(questions[0]?.question).toContain("rm -rf /");
     expect(questions[0]?.question?.indexOf("**Security Audit:**")).toBeLessThan(
       questions[0]?.question?.indexOf("Command:") ?? -1,
     );
@@ -426,8 +428,11 @@ describe("registerBashGuard", () => {
 });
 
 describe("formatCommandDisplay", () => {
-  test("formats single-line command with indentation", () => {
-    expect(formatCommandDisplay("git status")).toBe("Command:\n  git status");
+  test("formats single-line command with indentation and prompt prefix", () => {
+    const res = formatCommandDisplay("git status");
+    expect(res).toContain("Command:");
+    expect(res).toContain("$");
+    expect(res).toContain("git status");
   });
 
   test("formats full multiline command without truncation", () => {

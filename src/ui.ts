@@ -1,11 +1,19 @@
 import type { BlockResult, ExtensionContext, ExtensionUIContext } from "./types";
 
 export function formatCommandDisplay(command: string): string {
+  const yellow = "\x1b[93;1m";
+  const dim = "\x1b[90m";
+  const reset = "\x1b[0m";
   const lines = command.split("\n");
   if (lines.length > 1) {
-    return `Command:\n${lines.map((l) => `  ${l}`).join("\n")}`;
+    const formatted = lines
+      .map((l, i) =>
+        i === 0 ? `  ${dim}$${reset} ${yellow}${l}${reset}` : `    ${yellow}${l}${reset}`,
+      )
+      .join("\n");
+    return `Command:\n${formatted}`;
   }
-  return `Command:\n  ${command}`;
+  return `Command:\n  ${dim}$${reset} ${yellow}${command}${reset}`;
 }
 
 async function promptWithSelect(
@@ -101,16 +109,30 @@ export async function promptUser(
   const commandBlock = formatCommandDisplay(command);
 
   if (typeof ctx.ui.select === "function") {
-    const promptTitle = `Bash Guard\nSecurity Audit:\n  ${reason}\n\n${commandBlock}\n\nAllow execution?`;
+    const bold = "\x1b[1m";
+    const warn = "\x1b[38;5;208;1m";
+    const white = "\x1b[97m";
+    const reset = "\x1b[0m";
+
+    const promptTitle = [
+      "Bash Guard",
+      `${bold}Security Audit:${reset}`,
+      `  ${warn}⚠${reset} ${white}${reason}${reset}`,
+      "",
+      `${bold}${commandBlock}${reset}`,
+      "",
+      `${bold}Allow execution?${reset}`,
+    ].join("\n");
+
     return await promptWithSelect(ctx.ui, promptTitle, reason);
   }
 
-  if (typeof ctx.ui.askDialog === "function") {
-    const question = `**Security Audit:**\n${reason}\n\n${commandBlock}\n\n**Allow execution?**`;
+  if (typeof ctx.ui?.askDialog === "function") {
+    const question = `**Security Audit:**\n⚠ ${reason}\n\n${commandBlock}\n\n**Allow execution?**`;
     return await promptWithAskDialog(ctx.ui, question, reason);
   }
 
-  if (typeof ctx.ui.confirm === "function") {
+  if (typeof ctx.ui?.confirm === "function") {
     const approved = await ctx.ui.confirm(
       "⚠️ Sensitive / Unsafe Command Approval",
       `Security Audit:\n${reason}\n\n${commandBlock}\n\nAllow execution?`,
