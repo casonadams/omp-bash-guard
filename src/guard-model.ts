@@ -49,7 +49,7 @@ export async function evaluateCommandSafety(
           },
         ],
       },
-      { apiKey, signal: controller.signal, temperature: 0.0, maxTokens: 120 },
+      { apiKey, signal: controller.signal, temperature: 0.0, maxTokens: 256 },
     );
     clearTimeout(timeoutId);
 
