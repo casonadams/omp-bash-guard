@@ -460,9 +460,12 @@ describe("promptUser", () => {
 });
 
 describe("GUARD_SYSTEM_PROMPT", () => {
-  test("aligns with rho guard prompt structure", () => {
+  test("aligns with focused safe vs unsafe prompt structure", () => {
     expect(GUARD_SYSTEM_PROMPT).toContain("<identity>");
     expect(GUARD_SYSTEM_PROMPT).toContain("</identity>");
+    expect(GUARD_SYSTEM_PROMPT).toContain("SAFE or UNSAFE to execute");
+    expect(GUARD_SYSTEM_PROMPT).not.toContain("coding agent");
+    expect(GUARD_SYSTEM_PROMPT).not.toContain("human confirmation");
     expect(GUARD_SYSTEM_PROMPT).toContain("<principles>");
     expect(GUARD_SYSTEM_PROMPT).toContain("</principles>");
     expect(GUARD_SYSTEM_PROMPT).toContain("<safe_categories>");

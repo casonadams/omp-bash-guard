@@ -67,7 +67,7 @@ export function parseGuardOutput(text: string): { safe: boolean; reason: string 
 
   return {
     safe: isSafe,
-    reason: fallbackReason || "Action requires human approval.",
+    reason: fallbackReason || "Potential security risk detected.",
   };
 }
 
@@ -109,7 +109,7 @@ export async function evaluateCommandSafety(
   } catch (err) {
     return {
       safe: false,
-      reason: `Guard model check failed (${err instanceof Error ? err.message : String(err)}). Approval required.`,
+      reason: `Guard model check failed (${err instanceof Error ? err.message : String(err)}). Command not verified safe.`,
     };
   } finally {
     clearTimeout(timeoutId);
