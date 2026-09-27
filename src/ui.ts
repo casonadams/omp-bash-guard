@@ -1,18 +1,21 @@
 import type { BlockResult, ExtensionContext } from "./types";
 
+function blockedHeadless(reason: string): BlockResult {
+  return {
+    block: true,
+    reason: `[Bash Guard] Blocked unsafe command (headless mode): ${reason}`,
+  };
+}
+
 export async function promptUser(
   ctx: ExtensionContext | undefined,
   command: string,
   reason: string,
 ): Promise<BlockResult | void> {
   if (!ctx?.hasUI) {
-    return {
-      block: true,
-      reason: `[Bash Guard] Blocked unsafe command (headless mode): ${reason}`,
-    };
+    return blockedHeadless(reason);
   }
 
-  // 1. Native built-in askDialog with scrollable code preview
   if (typeof ctx.ui?.askDialog === "function") {
     const res = await ctx.ui.askDialog([
       {
@@ -53,7 +56,6 @@ export async function promptUser(
     };
   }
 
-  // 2. Native confirm fallback
   if (typeof ctx.ui?.confirm === "function") {
     const approved = await ctx.ui.confirm(
       "Bash Guard",
@@ -63,8 +65,5 @@ export async function promptUser(
     return { block: true, reason: `User denied execution: ${reason}` };
   }
 
-  return {
-    block: true,
-    reason: `[Bash Guard] Blocked unsafe command (headless mode): ${reason}`,
-  };
+  return blockedHeadless(reason);
 }

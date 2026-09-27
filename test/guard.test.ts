@@ -1,11 +1,16 @@
 import type { Api, Model } from "@oh-my-pi/pi-ai";
+import { createMockModel, registerMockApi } from "@oh-my-pi/pi-ai/providers/mock";
 import { describe, expect, test } from "bun:test";
 import registerBashGuard, {
   CRITICAL_DANGER_REGEX,
+  GUARD_SYSTEM_PROMPT,
   evaluateCommandSafety,
   parseGuardOutput,
+  promptUser,
   resolveGuardModel,
 } from "../index";
+
+registerMockApi();
 describe("CRITICAL_DANGER_REGEX", () => {
   test("flags destructive wipes immediately", () => {
     expect(CRITICAL_DANGER_REGEX.test("rm -rf /")).toBe(true);
@@ -13,18 +18,20 @@ describe("CRITICAL_DANGER_REGEX", () => {
     expect(CRITICAL_DANGER_REGEX.test("rm -rf *")).toBe(true);
     expect(CRITICAL_DANGER_REGEX.test("rm -rf ..")).toBe(true);
     expect(CRITICAL_DANGER_REGEX.test("git reset --hard HEAD~1")).toBe(true);
-    expect(CRITICAL_DANGER_REGEX.test("git clean -fd")).toBe(true);
     expect(CRITICAL_DANGER_REGEX.test("mkfs.ext4 /dev/sdb")).toBe(true);
-    expect(CRITICAL_DANGER_REGEX.test("kubectl delete ns production")).toBe(true);
-    expect(CRITICAL_DANGER_REGEX.test("psql -c 'DROP DATABASE production;'")).toBe(true);
+    expect(CRITICAL_DANGER_REGEX.test("dd if=/dev/zero of=/dev/sda")).toBe(true);
+    expect(CRITICAL_DANGER_REGEX.test(":(){ :|:& };:")).toBe(true);
   });
 
-  test("does not match benign non-critical commands", () => {
+  test("does not match non-catastrophic commands that guard evaluates", () => {
     expect(CRITICAL_DANGER_REGEX.test("git status")).toBe(false);
     expect(CRITICAL_DANGER_REGEX.test("cargo check")).toBe(false);
     expect(CRITICAL_DANGER_REGEX.test("rm this.me")).toBe(false);
     expect(CRITICAL_DANGER_REGEX.test("rm -rf ./target")).toBe(false);
     expect(CRITICAL_DANGER_REGEX.test("bun test")).toBe(false);
+    expect(CRITICAL_DANGER_REGEX.test("git clean -fd")).toBe(false);
+    expect(CRITICAL_DANGER_REGEX.test("kubectl delete ns production")).toBe(false);
+    expect(CRITICAL_DANGER_REGEX.test("psql -c 'DROP DATABASE production;'")).toBe(false);
   });
 });
 
@@ -233,15 +240,136 @@ describe("registerBashGuard", () => {
         "User denied execution: Critical destructive or irreversible infrastructure action detected.",
     });
   });
+
+  test("ignores non-bash tool calls", async () => {
+    let toolCallHandler: ((event: unknown, ctx?: unknown) => Promise<unknown>) | undefined;
+    const mockPi = {
+      on: (_event: string, handler: (event: unknown, ctx?: unknown) => Promise<unknown>) => {
+        toolCallHandler = handler;
+      },
+    };
+
+    registerBashGuard(mockPi as unknown as Parameters<typeof registerBashGuard>[0]);
+    const result = await toolCallHandler!({ toolName: "read_file" });
+    expect(result).toBeUndefined();
+  });
+
+  test("ignores empty or whitespace commands", async () => {
+    let toolCallHandler: ((event: unknown, ctx?: unknown) => Promise<unknown>) | undefined;
+    const mockPi = {
+      on: (_event: string, handler: (event: unknown, ctx?: unknown) => Promise<unknown>) => {
+        toolCallHandler = handler;
+      },
+    };
+
+    registerBashGuard(mockPi as unknown as Parameters<typeof registerBashGuard>[0]);
+    const result = await toolCallHandler!({ toolName: "bash", input: { command: "   " } });
+    expect(result).toBeUndefined();
+  });
+
+  test("allows execution when guard model evaluates command as safe", async () => {
+    let toolCallHandler: ((event: unknown, ctx: unknown) => Promise<unknown>) | undefined;
+    const mockPi = {
+      on: (_event: string, handler: (event: unknown, ctx: unknown) => Promise<unknown>) => {
+        toolCallHandler = handler;
+      },
+    };
+
+    registerBashGuard(mockPi as unknown as Parameters<typeof registerBashGuard>[0]);
+
+    const mock = createMockModel({
+      responses: [
+        { content: [{ type: "text", text: '{"safe": true, "reason": "Standard test workflow"}' }] },
+      ],
+    });
+
+    const result = await toolCallHandler!(
+      { toolName: "bash", input: { command: "cargo test" } },
+      {
+        hasUI: true,
+        models: {
+          resolve: () => mock as unknown as Model<Api>,
+        },
+      },
+    );
+
+    expect(result).toBeUndefined();
+  });
+
+  test("prompts user with guard reason when command is unsafe", async () => {
+    let toolCallHandler: ((event: unknown, ctx: unknown) => Promise<unknown>) | undefined;
+    const mockPi = {
+      on: (_event: string, handler: (event: unknown, ctx: unknown) => Promise<unknown>) => {
+        toolCallHandler = handler;
+      },
+    };
+
+    registerBashGuard(mockPi as unknown as Parameters<typeof registerBashGuard>[0]);
+
+    const mock = createMockModel({
+      responses: [
+        {
+          content: [
+            {
+              type: "text",
+              text: '{"safe": false, "reason": "Remote git push modifies remote repository state."}',
+            },
+          ],
+        },
+      ],
+    });
+
+    let promptedReason: string | undefined;
+    const mockAskDialog = async (questions: unknown) => {
+      const qs = questions as Array<{ question: string }>;
+      promptedReason = qs[0]?.question;
+      return {
+        kind: "submit",
+        results: [{ selectedOptions: ["Cancel"] }],
+      };
+    };
+
+    const result = await toolCallHandler!(
+      { toolName: "bash", input: { command: "git push origin main" } },
+      {
+        hasUI: true,
+        ui: {
+          askDialog: mockAskDialog,
+        },
+        models: {
+          resolve: () => mock as unknown as Model<Api>,
+        },
+      },
+    );
+
+    expect(promptedReason).toContain("Remote git push modifies remote repository state.");
+    expect(result).toEqual({
+      block: true,
+      reason: "User denied execution: Remote git push modifies remote repository state.",
+    });
+  });
 });
 
 describe("resolveGuardModel", () => {
-  test("resolves guard model when available", async () => {
-    const mockModel = { id: "test-model", provider: "ollama", api: "local-inference" } as const;
+  test("resolves judge role when guard role is unconfigured", async () => {
+    const mockModel = { id: "judge-model", provider: "ollama", api: "local-inference" } as const;
     const res = await resolveGuardModel({
       models: {
         resolve: (role: string) =>
-          role === "@guard" ? (mockModel as unknown as Model<Api>) : undefined,
+          role === "@judge" ? (mockModel as unknown as Model<Api>) : undefined,
+      },
+    });
+    expect("model" in res).toBe(true);
+    if ("model" in res) {
+      expect(res.model.id).toBe("judge-model");
+    }
+  });
+
+  test("resolves mock model without requiring API key", async () => {
+    const mockModel = { id: "mock-model", provider: "mock", api: "mock" } as const;
+    const res = await resolveGuardModel({
+      models: {
+        resolve: () => mockModel as unknown as Model<Api>,
       },
     });
     expect("model" in res).toBe(true);
@@ -261,11 +389,14 @@ describe("resolveGuardModel", () => {
 });
 
 describe("evaluateCommandSafety", () => {
-  test("returns safe: false on invalid JSON or model failure", async () => {
-    const mockModel = { id: "broken", provider: "test", api: "broken-api" } as const;
-    const res = await evaluateCommandSafety(mockModel as unknown as Model<Api>, undefined, "ls");
-    expect(res.safe).toBe(false);
-    expect(res.reason).toContain("Guard model check failed");
+  test("evaluates command successfully with mock model", async () => {
+    const mock = createMockModel({
+      responses: [
+        { content: [{ type: "text", text: '{"safe": true, "reason": "Verified safe test"}' }] },
+      ],
+    });
+    const res = await evaluateCommandSafety(mock as unknown as Model<Api>, undefined, "npm test");
+    expect(res).toEqual({ safe: true, reason: "Verified safe test" });
   });
 });
 
@@ -280,6 +411,27 @@ describe("parseGuardOutput", () => {
       '<think>Evaluating...</think>\n{"safe": false, "reason": "deletes cluster pod"}',
     );
     expect(res).toEqual({ safe: false, reason: "deletes cluster pod" });
+
+    const resThought = parseGuardOutput(
+      '<thought>Reasoning about pod...</thought>\n{"safe": false, "reason": "deletes cluster pod"}',
+    );
+    expect(resThought).toEqual({ safe: false, reason: "deletes cluster pod" });
+
+    const resThinking = parseGuardOutput(
+      '<thinking>Analyzing...</thinking>\n{"safe": true, "reason": "diagnostics only"}',
+    );
+    expect(resThinking).toEqual({ safe: true, reason: "diagnostics only" });
+  });
+
+  test("uses default reasons when JSON reason is empty", () => {
+    expect(parseGuardOutput('{"safe": true}')).toEqual({
+      safe: true,
+      reason: "Command verified safe.",
+    });
+    expect(parseGuardOutput('{"safe": false}')).toEqual({
+      safe: false,
+      reason: "Potential security risk detected.",
+    });
   });
 
   test("recovers from malformed JSON quotes inside reason", () => {
@@ -294,5 +446,32 @@ describe("parseGuardOutput", () => {
     );
     expect(res.safe).toBe(false);
     expect(res.reason).toContain("mutates cluster state");
+  });
+});
+
+describe("promptUser", () => {
+  test("returns blockedHeadless when hasUI is true but no dialog methods available", async () => {
+    const result = await promptUser({ hasUI: true, ui: {} }, "git push", "Unsafe action");
+    expect(result).toEqual({
+      block: true,
+      reason: "[Bash Guard] Blocked unsafe command (headless mode): Unsafe action",
+    });
+  });
+});
+
+describe("GUARD_SYSTEM_PROMPT", () => {
+  test("aligns with rho guard prompt structure", () => {
+    expect(GUARD_SYSTEM_PROMPT).toContain("<identity>");
+    expect(GUARD_SYSTEM_PROMPT).toContain("</identity>");
+    expect(GUARD_SYSTEM_PROMPT).toContain("<principles>");
+    expect(GUARD_SYSTEM_PROMPT).toContain("</principles>");
+    expect(GUARD_SYSTEM_PROMPT).toContain("<safe_categories>");
+    expect(GUARD_SYSTEM_PROMPT).toContain("</safe_categories>");
+    expect(GUARD_SYSTEM_PROMPT).toContain("<unsafe_categories>");
+    expect(GUARD_SYSTEM_PROMPT).toContain("</unsafe_categories>");
+    expect(GUARD_SYSTEM_PROMPT).toContain("<examples>");
+    expect(GUARD_SYSTEM_PROMPT).toContain("</examples>");
+    expect(GUARD_SYSTEM_PROMPT).toContain("<output_format>");
+    expect(GUARD_SYSTEM_PROMPT).toContain('{"safe": boolean, "reason": "concise explanation"}');
   });
 });

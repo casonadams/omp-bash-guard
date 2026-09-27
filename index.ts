@@ -25,6 +25,7 @@ export default function registerBashGuard(pi: PiExtensionAPI) {
           "Critical destructive or irreversible infrastructure action detected.",
         );
       }
+
       const guard = await resolveGuardModel(ctx);
       if ("block" in guard) {
         return promptUser(ctx, command, guard.reason);

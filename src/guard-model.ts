@@ -16,7 +16,13 @@ export async function resolveGuardModel(ctx?: ExtensionContext): Promise<GuardMo
   }
 
   const apiKey = await ctx?.modelRegistry?.getApiKey(model).catch(() => undefined);
-  if (!apiKey && model.api !== "local-inference" && model.provider !== "ollama") {
+  const isKeyless =
+    model.api === "local-inference" ||
+    model.provider === "ollama" ||
+    model.api === "mock" ||
+    model.provider === "mock";
+
+  if (!apiKey && !isKeyless) {
     return {
       block: true,
       reason: `Guard model "${model.provider}/${model.id}" requires an API key, but none was found.`,
@@ -27,7 +33,9 @@ export async function resolveGuardModel(ctx?: ExtensionContext): Promise<GuardMo
 }
 
 export function parseGuardOutput(text: string): { safe: boolean; reason: string } {
-  const clean = text.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+  const clean = text
+    .replace(/<(?:think|thought|thinking)>[\s\S]*?<\/(?:think|thought|thinking)>/gi, "")
+    .trim();
   const start = clean.indexOf("{");
   const end = clean.lastIndexOf("}");
   if (start !== -1 && end > start) {
@@ -68,10 +76,10 @@ export async function evaluateCommandSafety(
   apiKey: string | undefined,
   command: string,
 ): Promise<{ safe: boolean; reason: string }> {
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 4000);
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 4000);
 
+  try {
     const response = await completeSimple(
       model,
       {
@@ -91,7 +99,6 @@ export async function evaluateCommandSafety(
       },
       { apiKey, signal: controller.signal, temperature: 0.0, maxTokens: 256 },
     );
-    clearTimeout(timeoutId);
 
     const textBlock = response.content.find(
       (b): b is { type: "text"; text: string } => b.type === "text" && typeof b.text === "string",
@@ -104,5 +111,7 @@ export async function evaluateCommandSafety(
       safe: false,
       reason: `Guard model check failed (${err instanceof Error ? err.message : String(err)}). Approval required.`,
     };
+  } finally {
+    clearTimeout(timeoutId);
   }
 }

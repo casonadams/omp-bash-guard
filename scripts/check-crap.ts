@@ -8,14 +8,19 @@ const MAX_ALLOWED_CRAP = 15;
 
 const res = await $`bun test --coverage`.quiet();
 const coverageOutput = `${res.stdout}\n${res.stderr}`;
+
 interface FileMetric {
   file: string;
   lineCoverage: number;
   funcCoverage: number;
 }
 
+const ANSI_REGEX = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*[a-zA-Z]`, "g");
+const stripAnsi = (str: string) => str.replace(ANSI_REGEX, "");
+
 const fileMetrics: FileMetric[] = [];
-for (const line of coverageOutput.split("\n")) {
+for (const rawLine of coverageOutput.split("\n")) {
+  const line = stripAnsi(rawLine);
   const parts = line.split("|").map((s) => s.trim());
   if (parts.length >= 3 && parts[0].endsWith(".ts") && !parts[0].includes("test")) {
     fileMetrics.push({
@@ -59,10 +64,12 @@ for (const m of fileMetrics) {
 
 console.log("===================================================\n");
 
-if (hasExcessiveCrap) {
-  console.error(
-    `\x1b[31mCRAP check failed: One or more modules exceed max CRAP score of ${MAX_ALLOWED_CRAP}\x1b[0m`,
-  );
+if (hasExcessiveCrap || fileMetrics.length === 0) {
+  const message =
+    fileMetrics.length === 0
+      ? "CRAP check failed: No coverage metrics could be parsed."
+      : `CRAP check failed: One or more modules exceed max CRAP score of ${MAX_ALLOWED_CRAP}`;
+  console.error(`\x1b[31m${message}\x1b[0m`);
   process.exit(1);
 } else {
   console.log("\x1b[32m✔ All modules have low CRAP scores (well under threshold of 15).\x1b[0m\n");
