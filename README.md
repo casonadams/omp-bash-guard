@@ -1,5 +1,16 @@
 # omp-bash-guard
 
+> [!NOTE]
+> **This plugin has moved!**
+> It is now maintained as [`guard`](https://github.com/casonadams/omp-plugins/tree/main/plugins/guard) inside the [`casonadams/omp-plugins`](https://github.com/casonadams/omp-plugins) marketplace catalog.
+>
+> Install with:
+>
+> ```bash
+> omp plugin marketplace add casonadams/omp-plugins
+> omp plugin install guard@casonadams-plugins
+> ```
+
 Security gatekeeper extension and plugin for
 [oh-my-pi](https://github.com/can1357/oh-my-pi).
 
